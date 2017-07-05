@@ -1,0 +1,30 @@
+{
+  "name": "human-shaped-bot",
+  "version": "1.0.0",
+  "description": "Node twitter bot that will let people interact with the Human shaped World website",
+  "main": "twitterBot.js",
+  "scripts": {
+    "start": "node twitterBot.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PeterOtto/Human-Shaped-Bot.git"
+  },
+  "keywords": [
+    "Human",
+    "Shaped",
+    "World",
+    "Twitter",
+    "Bot"
+  ],
+  "author": "PeterOK",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/PeterOtto/Human-Shaped-Bot/issues"
+  },
+  "homepage": "https://github.com/PeterOtto/Human-Shaped-Bot#readme",
+  "dependencies": {
+    "twit": "^2.2.9"
+  }
+}
