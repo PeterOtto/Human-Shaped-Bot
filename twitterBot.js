@@ -5,9 +5,9 @@ var Twit = require('twit')
 // importing the firebase node module
 var firebase = require('firebase');
 //importing the config file for the twitter api
-var twitterConfig = require('config/twitterConfig');
+var twitterConfig = require('./config/twitterConfig.js');
 //importing the config file for the firebase db
-var firebaseConfig = require('config/firebaseConfig');
+var firebaseConfig = require('./config/firebaseConfig.js');
 //sets up a new instence of Twit called T
 var T = new Twit(twitterConfig);
 //setting up a new instance of firebase, called app - for now
