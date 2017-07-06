@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/PeterOtto/Human-Shaped-Bot#readme",
   "dependencies": {
+    "firebase": "^4.1.3",
     "twit": "^2.2.9"
   }
 }
