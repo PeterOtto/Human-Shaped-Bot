@@ -1,5 +1,10 @@
 //logging that the bot is starting
-console.log("The twitter bot is starting");
+console.log("The twitter bot has started");
+console.log("---------------------------");
+console.log("Ver. 0.1 by PeterOK");
+console.log("");
+
+/* ----- IMPORTING AND SETTING UP NODE MODULES ----- */
 
 // importing twit node module
 var Twit = require('twit')
@@ -20,103 +25,148 @@ var googleMapsClient = require('@google/maps').createClient({
   key: 'AIzaSyBbiaUFvlp2Skd7m4qm6FdBv0611rJbf-o'
 });
 
-/*-------------------------------------------------------------------------------------------
+/* ----- SETTING UP THE TWO STREAMS THAT LISTENS FOR HASHTAGS AND FOR TWEETS @NOTHUMANSHAPED ----- */
 
-	This section is for handeling and replaying to people tweeting directly @NotHumanShaped
+// opens up a stream that recieves data about the the twitter user
+var twitterStream = T.stream("user");
+//when we recieve a tweet on the stream send the data to tweetReceived
+twitterStream.on("tweet", tweetReceived);
+// opens up a stream that fires everytime somebody tweets a certain hashtag
+var hashtagStream = T.stream('statuses/filter', { track: 'nothumanshaped,humanshapedworld,' })
+hashtagStream.on('tweet', hashtagFound);
 
--------------------------------------------------------------------------------------------*/
+/* -----  THIS IS WEHERE WE PUT ALL THE DIFFERENT VARIABLES ----- */
+
 //Random greeting to prevent twitter for blocking duplicate tweets
 var greetings = ["Hello","Hi","G’day","Howdy","Hey","Ciao","Aloha","Salut","Hej"];
-// creates a var called stream, where we store data from the twitter stream
-var stream = T.stream("user");
-//when we recieve a tweet on the stream send the data to tweetReceived
-stream.on("tweet", tweetReceived);
+//booleans to test if it's a valid tweet
+var botMentionted = false;
+var botTweetedAt = false;
+var botTagged = false;
+var locationFound = false;
+var hasImage = false;
+var locatioTagged = true;
+//info from tweets
+var replyto;
+var from;
+var text;
+var location;
+var cityName;
+var img;
+//profile data
+var name;
+var url;
+var profilePic;
 
+/* -----  THIS SECTION IS FOR RECIEVING THE DATA AND CHECKING IF ALL THE DATA THAT WE'LL NEED IS THERE ----- */
 //function for handeling the data that we recive from the tweet
 function tweetReceived(eventMsg) {
-	// if tweet is send @NotHumanShaped do stuff
-	var replyto = eventMsg.in_reply_to_screen_name;
-	if (replyto === "NotHumanShaped") {
-		var greeting = greetings[Math.floor(Math.random() * greetings.length)];
-		//get the user name of the person tweeting us
-		var from = eventMsg.user.screen_name;
-		//If they have shared their location and a photo we'll continue - or else we'll send them an error.
-		if (eventMsg.geo != null && eventMsg.entities.media != null) {
-			//save the data
-			var text = eventMsg.text;
-			var location = eventMsg.geo.coordinates;
-			var place = eventMsg.place.bounding_box.coordinates;
-			var cityName = eventMsg.place.name;
-			var img = eventMsg.entities.media[0].media_url_https;
-			saveDataFromTweet(text, from, place, location, cityName, img);
-			//reply to the person
-			replyToUser(from, "Thanks for sharing that with me, I've add it to our website.");
-		}
-		
-		/*
-		This could be done a lot smarter, with setting some flags, but for now we'll just be doing it with if statements instead haha!
-		*/
+	if (eventMsg.user.screen_name != "NotHumanShaped") {
+		// if tweet is send @NotHumanShaped do stuff
+		replyto = eventMsg.in_reply_to_screen_name;
+		text = eventMsg.text;
+		for (var i = eventMsg.entities.user_mentions.length - 1; i >= 0; i--) {
+			if (eventMsg.entities.user_mentions[i].screen_name === "NotHumanShaped" || replyto === "NotHumanShaped" || from) {
+				from = eventMsg.user.screen_name;
+				botMentionted = true;
 
-		//check to see if they have shared their location with the bot
-		if (eventMsg.geo === null && eventMsg.entities.media) {
-			//reply with reminder to set location
-			replyToUser(from, greeting + ", you forgot to share your location with me");
+				if (eventMsg.geo != null) {
+					locationFound = true;
+					location = eventMsg.geo.coordinates;
+					cityName = eventMsg.place.name;
+				}
+
+				if (eventMsg.place != null && eventMsg.geo == null) {
+					locationFound = true;
+					cityName = eventMsg.place.name;
+					var tmpLng = 0;
+					var tmpLat = 0;
+
+					for (var k = 0; k < 4; k++) {
+						tmpLng = eventMsg.place.bounding_box.coordinates[0][k][0] + tmpLng;
+						tmpLat = eventMsg.place.bounding_box.coordinates[0][k][1] + tmpLat;
+						location = [tmpLat/4, tmpLng/4];
+					}
+				}
+
+				if (eventMsg.entities.media) {
+					hasImage = true;
+					img = eventMsg.entities.media[0].media_url_https;
+				}
+			}
 		}
-		//check to see if they have shared a photo with the bot
-		if (!eventMsg.entities.media && eventMsg.geo != null) {
-			//reply with reminder to share a photo
-			replyToUser(from, greeting + ", you forgot to share a photo width me");
-		}
-		// If they haven't shared anything - we make the assumption that it's the first time that they write the bot
-		if (eventMsg.geo === null && !eventMsg.entities.media) {
-			//reply with an intro to the bot
-			replyToUser(from, greeting + ", if you see something not human shaped please send me a photo, with a description and your location.");
+
+		if (typeof from != 'undefined'  && typeof text != 'undefined' && typeof location != 'undefined' && typeof cityName != 'undefined' && typeof img != 'undefined') {
+			validTweet(eventMsg);
+		} else {
+			if (!locatioTagged) {
+				invalidTweet();
+			}
 		}
 	}
 }
 
-/*-------------------------------------------------------------------------------
-
-	This section is for handeling tweets with the #nothumanshaped and replaying
-
---------------------------------------------------------------------------------*/
-
-var stream = T.stream('statuses/filter', { track: 'nothumanshaped,humanshapedworld,' })
-
-stream.on('tweet', hashtagFound);
 function hashtagFound(tweet) {
-	console.log("We got a tweet");
+	botTagged = true;
+
+	if (tweet.extended_entities.media) {
+		hasImage = true;
+		img = tweet.extended_entities.media[0].media_url_https;
+	}
+
 	for (var i = tweet.entities.hashtags.length - 1; i >= 0; i--) {
 		// Geocode the hashtags.
 		googleMapsClient.geocode({address: tweet.entities.hashtags[i].text},
 		function(err, response) {
-			if (!err && response.json.status === "OK") {
-				console.log("Valid tweet found!")
-		  		validTweet(response,tweet);
-		  	}
+			if (!err && response.json.status === "OK" && !locationFound) {
+				locationFound = true;
+				location = [response.json.results[0].geometry.location.lat, response.json.results[0].geometry.location.lng];
+				cityName = response.json.results[0].formatted_address;
+				if (locationFound) {
+					from = tweet.user.screen_name;
+					tweetReceived(tweet);
+				}
+			} else {
+				locatioTagged = false;
+			}
 		});
 	}
 }
 
-function validTweet(response,tweet) {
-	console.log("running validTweet function");
-	
-	var from = tweet.user.screen_name;
-	var text = tweet.text;
-	var location = [response.json.results[0].geometry.location.lat, response.json.results[0].geometry.location.lng];
-	var place = "na";
-	var cityName = response.json.results[0].formatted_address;
-	var img = tweet.entities.media[0].media_url_https;
-	saveDataFromTweet(text, from, place, location, cityName, img);
-	console.log("Saveing data");
+function validTweet(eventMsg) {
+	name = eventMsg.user.name;
+	url = eventMsg.user.url;
+	profilePic = eventMsg.user.profile_image_url_https;
+	saveDataFromTweet();
+	replyToUser(from, "Thanks for sharing that with me, I've add it to our website.");
 }
 
-// Here we push the data to firebase
+function invalidTweet() {
+	console.log("Invalid tweet recieved");
+	var greeting = greetings[Math.floor(Math.random() * greetings.length)];
+	if (!location && img) {
+		replyToUser(from, greeting + ", looks like you forgot to share your location with me, either turn geo location on or tag the place.");
+	}
+
+	if (!img && location) {
+		replyToUser(from, greeting + ", looks like you forgot to share a photo width me");
+	}
+
+	if (!img && !location) {
+		replyToUser(from, greeting + ", have you see something not human shaped if so please send me a photo, with a description and your location.");
+	}
+}
+
+/* -----  HERE WE PUSH EVERYTHING TO THE DATABASE ----- */
 // Eventually we want to store multiple tweets from the same user.
 // We also want to store some more info on them, profile pic, link, mail etc for the website
-function saveDataFromTweet(text, from, place, location, cityName, img) {
+function saveDataFromTweet() {
 	//here we'll be saving all the data	under users -> their twitter handle
 	firebase.database().ref('users/' + from).set({
+		"name": name,
+		"user name": from,
+		"url": url,
+		"profile Picture": profilePic,
 		"text": text,
 		"img": img,
 		"location" : {
@@ -129,6 +179,13 @@ function saveDataFromTweet(text, from, place, location, cityName, img) {
 }
 
 function replyToUser(tweetTo, messageToTweet) {
+	//setting everything to false
+	botMentionted = false;
+	botTweetedAt = false;
+	botTagged = false;
+	locationFound = false;
+	hasImage = false;
+	locatioTagged = true;
 	// Here we'll be replying to people tweeting at us (the bot)
 	console.log("preparing tweet");
 	//putting togheter what'll be in the tweet
